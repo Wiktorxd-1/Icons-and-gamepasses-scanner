@@ -8,11 +8,14 @@ Scan gamepasses and Game icons with this script
 - Python 3.14 or higher
 - `aiohttp` library
 - `pymongo` library
+- `datetime` library
+- `asyncio` library
+
 
 Command to install:
 
 ```bash
-pip install aiohttp pymongo
+pip install aiohttp pymongo datetime asyncio
 ```
 
 ## Configuration
