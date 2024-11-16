@@ -1,4 +1,4 @@
-```markdown
+
 # Gamepass & Icon scanner
 
 Scan gamepasses and Game icons with this script
