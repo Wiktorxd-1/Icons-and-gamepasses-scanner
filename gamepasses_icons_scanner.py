@@ -8,7 +8,8 @@ db = mongo_client["roblox"]
 game_passes_collection = db["gamepasses"]
 icons_collection = db["icons"]
 
-GAME_IDS = [8737899170, 18901165922] # place ids of games you want, not universe ids (pre set to ps99 and pet go)
+GAMEPASS_GAME_IDS = [8737899170, 18901165922] # place ids of games for the gamepass scanning, not universe ids (pre set to ps99 and pet go)
+ICONS_GAME_IDS = [8737899170, 18901165922]# place ids of games for game icon scanning, not universe ids (pre set to ps99 and pet go)
 
 headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
@@ -18,7 +19,11 @@ headers = {
 place_details_url = "https://games.roblox.com/v1/games/multiget-place-details?placeIds={place_id}"
 game_passes_url = "https://games.roblox.com/v1/games/{universe_id}/game-passes?limit=100&sortOrder=Asc"
 product_info_url = "https://apis.roblox.com/game-passes/v1/game-passes/{target_id}/phttpsroduct-info"
-WEBHOOK_URL = "" # webhook
+GAMEPASSES_WEBHOOK_URL = "" # webhook for gamepasses
+ICONS_WEBHOOK_URL = "" # webhook for game icons
+
+run_scan_gamepasses = True  # change to False if you don't want to use it
+run_icons_enabled = True  # change to False if you don't want to use it
 
 async def fetch_universe_id(session, place_id):
     async with session.get(place_details_url.format(place_id=place_id), headers=headers) as response:
@@ -56,7 +61,6 @@ async def store_game_pass_data(game_pass_info, universe_id):
     }
     
     print(f"Storing Game Pass Data: {game_pass_data}")
-    
 
     game_passes_collection.update_one(
         {"id": game_pass_data["id"]},
@@ -101,16 +105,18 @@ async def send_webhook(game_pass_info, game_name, game_pass_id, game_id, changes
         embed_data["description"] += "\n\n**Updates:**\n" + "\n".join(changes)
 
     async with aiohttp.ClientSession() as session:
-        response = await session.post(WEBHOOK_URL, json={"embeds": [embed_data]}, headers=headers)
+        response = await session.post(GAMEPASSES_WEBHOOK_URL, json={"embeds": [embed_data]}, headers=headers)
         if response.status == 204:
             print("Webhook sent successfully!")
         else:
             print(f"Failed to send webhook. Status: {response.status}. Response: {await response.text()}")
 
 async def scan_gamepasses():
+    if not run_scan_gamepasses:
+        return
     async with aiohttp.ClientSession() as session:
         while True:
-            for place_id in GAME_IDS:
+            for place_id in GAMEPASS_GAME_IDS:
                 universe_id, game_name = await fetch_universe_id(session, place_id)
                 if universe_id is None:
                     continue
@@ -187,11 +193,13 @@ async def send_update_embed(game_name, game_id, universe_id, old_url, new_url, i
     }
 
     async with aiohttp.ClientSession() as session:
-        await session.post(WEBHOOK_URL, json={"embeds": [embed]})
+        await session.post(ICONS_WEBHOOK_URL, json={"embeds": [embed]})
 
 async def script_main():
+    if not run_icons_enabled:
+        return
     while True:
-        for game_id in GAME_IDS:
+        for game_id in ICONS_GAME_IDS:
             game, universe_id, game_name, new_url = await get_game_details(game_id)
             if game:
                 icon_url = await get_game_icon(universe_id)
@@ -205,7 +213,13 @@ async def script_main():
         await asyncio.sleep(5)
 
 async def main():
-    await asyncio.gather(scan_gamepasses(), script_main())
+    tasks = []
+    if run_scan_gamepasses:
+        tasks.append(scan_gamepasses())
+    if run_icons_enabled:
+        tasks.append(script_main())
+    
+    await asyncio.gather(*tasks)
 
 if __name__ == "__main__":
     asyncio.run(main())
